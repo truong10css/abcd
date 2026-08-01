@@ -1,40 +1,108 @@
--- NEXUS HUB V2 - MENU DEP + ESP + GODMODE + SPEED + JUMP
--- TUONG THICH: Synapse X, Krnl, Fluxus, ArceusX
--- CHUC NANG: Menu giao dien hien dai, drag, toggle, slider, close
+-- Them dong/mo menu bang phim (vi du: phim Insert)  
+local Players = game:GetService("Players")  
+local player = Players.LocalPlayer  
+local gui = Instance.new("ScreenGui")  
+gui.Name = "HackMenu"  
+gui.Parent = player:WaitForChild("PlayerGui")  
+gui.Enabled = false  -- mac dinh tat  
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
+local frame = Instance.new("Frame")  
+frame.Size = UDim2.new(0, 300, 0, 200)  
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)  
+frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.15)  
+frame.Visible = true  
+frame.Parent = gui  
 
--- ===== CONFIG =====
-local CONFIG = {
-    Speed = 50,
-    JumpPower = 80,
-    GodMode = true,
-    AntiStun = true,
-    NoFallDamage = true,
-    WalkOnWater = false,
-    ShowESP = true,
-    ShowBox = true,
-    ShowTracer = true,
-    ShowName = true,
-    ShowDistance = true,
-    ShowHealthBar = true,
-    MaxDistance = 500,
-}
+local states = {  
+   TargetLock = false,  
+   LineOfSight = false,  
+   RadarESP = false  
+}  
 
--- ===== BIEN =====
-local character, humanoid, rootPart = nil, nil, nil
-local espObjects = {}
-local menuVisible = true
-local dragData = { dragging = false, offset = Vector2.new(0, 0) }
+local function makeToggle(name, yPos, stateKey)  
+   local btn = Instance.new("TextButton")  
+   btn.Size = UDim2.new(0.9, 0, 0, 30)  
+   btn.Position = UDim2.new(0.05, 0, 0, yPos)  
+   btn.Text = name .. ": OFF"  
+   btn.BackgroundColor3 = Color3.new(0.2, 0.2, 0.3)  
+   btn.TextColor3 = Color3.new(1, 1, 1)  
+   btn.Parent = frame  
+   btn.MouseButton1Click:Connect(function()  
+      states[stateKey] = not states[stateKey]  
+      btn.Text = name .. ": " .. (states[stateKey] and "ON" or "OFF")  
+   end)  
+end  
 
--- ===== TAO MENU BANG SCREENGUI (DEP, TUONG THICH) =====
-local function createModernMenu()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "NexusHub"
+makeToggle("Khoa muc tieu", 40, "TargetLock")  
+makeToggle("Tam nhin", 80, "LineOfSight")  
+makeToggle("Radar/ESP", 120, "RadarESP")  
+
+-- Nut dong menu (tren goc phai)  
+local closeBtn = Instance.new("TextButton")  
+closeBtn.Size = UDim2.new(0, 25, 0, 25)  
+closeBtn.Position = UDim2.new(1, -30, 0, 5)  
+closeBtn.Text = "X"  
+closeBtn.BackgroundColor3 = Color3.new(0.8, 0.1, 0.1)  
+closeBtn.TextColor3 = Color3.new(1, 1, 1)  
+closeBtn.Parent = frame  
+closeBtn.MouseButton1Click:Connect(function()  
+   gui.Enabled = false  
+end)  
+
+-- Ham raycasting  
+local Workspace = game:GetService("Workspace")  
+local function hasLineOfSight(origin, targetPos, ignoreList)  
+   local params = RaycastParams.new()  
+   params.FilterType = Enum.RaycastFilterType.Blacklist  
+   params.FilterDescendantsInstances = ignoreList or {}  
+   local direction = (targetPos - origin).Unit * (origin - targetPos).Magnitude  
+   local result = Workspace:Raycast(origin, direction, params)  
+   return result == nil  
+end  
+
+-- Dieu huong camera Lerp  
+local RunService = game:GetService("RunService")  
+local camera = Workspace.CurrentCamera  
+local function smoothLookAt(targetPos, alpha)  
+   local currentCF = camera.CFrame  
+   local lookAtCF = CFrame.new(camera.CFrame.Position, targetPos)  
+   camera.CFrame = currentCF:Lerp(lookAtCF, alpha or 0.2)  
+end  
+
+local function getNearestLivingHead()  
+   local nearest = nil  
+   local minDist = math.huge  
+   for _, p in pairs(Players:GetPlayers()) do  
+      if p ~= player and p.Character and p.Character:FindFirstChild("Head") then  
+         local headPos = p.Character.Head.Position  
+         local dist = (headPos - camera.CFrame.Position).Magnitude  
+         if dist < minDist then  
+            minDist = dist  
+            nearest = p.Character.Head  
+         end  
+      end  
+   end  
+   return nearest  
+end  
+
+-- Phim bat/tat menu (Insert)  
+local UserInputService = game:GetService("UserInputService")  
+UserInputService.InputBegan:Connect(function(input, gameProcessed)  
+   if gameProcessed then return end  
+   if input.KeyCode == Enum.KeyCode.Insert then  
+      gui.Enabled = not gui.Enabled  
+   end  
+end)  
+
+-- Vong lap chinh  
+RunService.RenderStepped:Connect(function()  
+   if states.TargetLock and gui.Enabled then  
+      local targetHead = getNearestLivingHead()  
+      if targetHead then  
+         smoothLookAt(targetHead.Position, 0.15)  
+      end  
+   end  
+end)      gui.Name = "NexusHub"
     gui.ResetOnSpawn = false
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = LocalPlayer:FindFirstChild("PlayerGui") or game:GetService("CoreGui")
